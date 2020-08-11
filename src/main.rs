@@ -196,6 +196,9 @@ fn instance_list() -> Result<()> {
         .map(|inst| inst.to_string())
         .collect::<Vec<_>>()
         .join("\n---\n");
+    if let Some(active) = config.active {
+        println!("Active instance: {}", active)
+    };
     println!("Configured instances:\n---\n{}", info);
     Ok(())
 }
@@ -257,6 +260,7 @@ async fn instance_status() -> Result<()> {
 async fn status(instance: &InstanceConfig) -> Result<()> {
     let manager = get_manager(&instance.cloud, &instance.profile)?;
     let status = manager.get_instance(&instance.instance_id).await?;
+    println!("Alias: {}", instance.alias);
     println!("{}", status.to_string());
     Ok(())
 }
