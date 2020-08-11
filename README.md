@@ -1,6 +1,13 @@
-# Remote – Cloud Dev Machine Manager
+# Remote – Cloud Instance Manager
+Simple CLI tool for managing cloud instances for remote development.
 
-## Commands
+## Install
+Compile and install via cargo
+```
+cargo install --path .
+```
+
+## Usage
 * Configure a new remote instance
 ```
 remote new
