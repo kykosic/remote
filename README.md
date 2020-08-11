@@ -12,13 +12,13 @@ cargo install --path .
 ```
 remote new
 ```
-* Remove a remote instance
-```
-remote rm [alias]
-```
-* Switch remote instance
+* Switch active remote instance
 ```
 remote instance [alias]
+```
+* Get active instance status
+```
+remote status
 ```
 * Start active instance
 ```
@@ -32,10 +32,6 @@ remote stop
 ```
 remote ssh
 ```
-* Get active instance status
-```
-remote status
-```
 * Set active instance type
 ```
 remote resize [instance-type]
@@ -47,4 +43,8 @@ remote ls
 * List available instance for a cloud/profile
 ```
 remote ls [cloud] [profile]
+```
+* Remove a remote instance
+```
+remote rm [alias]
 ```
