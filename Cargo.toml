@@ -1,0 +1,26 @@
+[package]
+name = "remote"
+version = "0.1.0"
+authors = ["kylekosic <kylekosic@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+anyhow = "1.0"
+async-trait = "0.1"
+dirs = "3.0"
+rusoto_credential = "0.45"
+rusoto_core = "0.45"
+rusoto_ec2 = "0.45"
+serde = { version = "1.0", features = ["derive"] }
+serde_yaml = "0.8"
+structopt = "0.3"
+thiserror = "1.0"
+tokio = "0.2"
+
+[lib]
+name = "remote"
+path = "src/lib.rs"
+
+[[bin]]
+name = "remote"
+path = "src/main.rs"
