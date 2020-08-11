@@ -1,6 +1,9 @@
 # Remote – Cloud Instance Manager
 Simple CLI tool for managing cloud instances for remote development.
 
+
+Currently only supports AWS EC2 instances, but I will add more cloud providers as I need.
+
 ## Install
 Compile and install via cargo
 ```
