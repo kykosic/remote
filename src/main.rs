@@ -247,8 +247,7 @@ async fn open_ssh() -> Result<()> {
         .stdout(Stdio::inherit())
         .stderr(Stdio::inherit())
         .stdin(Stdio::inherit())
-        .output()
-        .unwrap();
+        .output()?;
     Ok(())
 }
 
