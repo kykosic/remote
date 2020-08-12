@@ -7,7 +7,7 @@ Currently only supports AWS EC2 instances, but I will add more cloud providers a
 ## Install
 Compile and install via cargo
 ```
-cargo install --path .
+cargo install --git https://github.com/kykosic/remote.git
 ```
 
 ## Usage
