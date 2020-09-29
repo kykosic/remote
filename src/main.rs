@@ -46,6 +46,9 @@ enum Opt {
         local_file: String,
         /// The remote path to copy to
         remote_file: String,
+        /// Copy directories recursively
+        #[structopt(short, long)]
+        recursive: bool,
     },
     #[structopt(about = "Copy a file from the active instance", alias = "down")]
     Download {
@@ -53,6 +56,9 @@ enum Opt {
         remote_file: String,
         /// The local path to copy to
         local_file: String,
+        /// Copy directories recursively
+        #[structopt(short, long)]
+        recursive: bool,
     },
     #[structopt(about = "Change the type of the active instance")]
     Resize {
@@ -283,20 +289,22 @@ async fn open_ssh() -> Result<()> {
     Ok(())
 }
 
-async fn run_scp(local_path: &str, remote_path: &str, upload: bool) -> Result<()> {
+async fn run_scp(local_path: &str, remote_path: &str, upload: bool, recursive: bool) -> Result<()> {
     let info = get_active_instance_connection_info().await?;
     let local_path = local_path.to_string();
     let remote_path = format!("{}@{}:{}", info.user, info.address, remote_path);
-    let (arg1, arg2) = if upload {
-        (local_path, remote_path)
-    } else {
-        (remote_path, local_path)
+
+    let mut cmd = Command::new("scp");
+    if recursive {
+        cmd.arg("-r");
     };
-    let _ = Command::new("scp")
-        .arg("-i")
-        .arg(info.key_path)
-        .arg(arg1)
-        .arg(arg2)
+    cmd.arg("-i").arg(info.key_path);
+    if upload {
+        cmd.arg(local_path).arg(remote_path);
+    } else {
+        cmd.arg(remote_path).arg(local_path);
+    };
+    let _ = cmd
         .stdout(Stdio::inherit())
         .stderr(Stdio::inherit())
         .stdin(Stdio::inherit())
@@ -357,11 +365,13 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
         Opt::Upload {
             local_file,
             remote_file,
-        } => run_scp(&local_file, &remote_file, true).await?,
+            recursive,
+        } => run_scp(&local_file, &remote_file, true, recursive).await?,
         Opt::Download {
             remote_file,
             local_file,
-        } => run_scp(&local_file, &remote_file, false).await?,
+            recursive,
+        } => run_scp(&local_file, &remote_file, false, recursive).await?,
         Opt::Status => instance_status().await?,
         Opt::Resize { instance_type } => instance_resize(&instance_type).await?,
         Opt::Ls { cloud, profile } => match cloud {
