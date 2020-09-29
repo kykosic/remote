@@ -35,6 +35,14 @@ remote stop
 ```
 remote ssh
 ```
+* Download file from active instance
+```
+remote download /path/to/remote.file /path/to/local.file
+```
+* Upload file to active instance
+```
+remote upload /path/to/local.file /path/to/remote.file
+```
 * Set active instance type
 ```
 remote resize [instance-type]

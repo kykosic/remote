@@ -40,6 +40,20 @@ enum Opt {
     Status,
     #[structopt(about = "SSH into the active instance")]
     Ssh,
+    #[structopt(about = "Copy a file to the active instance", alias = "up")]
+    Upload {
+        /// The path of the local file
+        local_file: String,
+        /// The remote path to copy to
+        remote_file: String,
+    },
+    #[structopt(about = "Copy a file from the active instance", alias = "down")]
+    Download {
+        /// The path of the remote file
+        remote_file: String,
+        /// The local path to copy to
+        local_file: String,
+    },
     #[structopt(about = "Change the type of the active instance")]
     Resize {
         /// The desired instance type
@@ -63,7 +77,10 @@ fn user_input(prompt: &str) -> Result<String> {
     Ok(input.trim().to_string())
 }
 
-fn expand_tilde<P: AsRef<Path>>(path_user_input: P) -> Option<PathBuf> {
+fn expand_tilde<P>(path_user_input: P) -> Option<PathBuf>
+where
+    P: AsRef<Path>,
+{
     let p = path_user_input.as_ref();
     if !p.starts_with("~") {
         return Some(p.to_path_buf());
@@ -188,6 +205,33 @@ fn get_active_instance() -> Result<InstanceConfig> {
     Ok(instances[0].to_owned())
 }
 
+pub struct ConnectionInfo {
+    pub user: String,
+    pub address: String,
+    pub key_path: PathBuf,
+}
+
+async fn get_active_instance_connection_info() -> Result<ConnectionInfo> {
+    let instance = get_active_instance()?;
+    let manager = get_manager(&instance.cloud, &instance.profile)?;
+    let status = manager.get_instance(&instance.instance_id).await?;
+    if status.state.as_str() != "running" {
+        Err(Error::msg("Instance is not running"))?;
+    };
+    if status.public_dns.as_str() == "" {
+        Err(Error::msg("Instance has no public DNS"))?;
+    };
+    let key_path = expand_tilde(&instance.key_path).ok_or(Error::msg(format!(
+        "Could not locate key {}",
+        &instance.key_path
+    )))?;
+    Ok(ConnectionInfo {
+        user: instance.user,
+        address: status.public_dns,
+        key_path,
+    })
+}
+
 fn instance_list() -> Result<()> {
     let config = ProfileConfig::get_or_create()?;
     let info = config
@@ -226,24 +270,33 @@ async fn stop_instance() -> Result<()> {
 }
 
 async fn open_ssh() -> Result<()> {
-    let instance = get_active_instance()?;
-    let manager = get_manager(&instance.cloud, &instance.profile)?;
-    let status = manager.get_instance(&instance.instance_id).await?;
-    if status.state.as_str() != "running" {
-        Err(Error::msg("Instance is not running"))?;
-    };
-    if status.public_dns.as_str() == "" {
-        Err(Error::msg("Instance has no public DNS"))?;
-    };
-    let key_path = expand_tilde(&instance.key_path).ok_or(Error::msg(format!(
-        "Could not locate key {}",
-        &instance.key_path
-    )))?;
-    let addr = format!("{}@{}", instance.user, status.public_dns);
+    let info = get_active_instance_connection_info().await?;
+    let addr = format!("{}@{}", info.user, info.address);
     let _ = Command::new("ssh")
         .arg("-i")
-        .arg(key_path)
+        .arg(info.key_path)
         .arg(addr)
+        .stdout(Stdio::inherit())
+        .stderr(Stdio::inherit())
+        .stdin(Stdio::inherit())
+        .output()?;
+    Ok(())
+}
+
+async fn run_scp(local_path: &str, remote_path: &str, upload: bool) -> Result<()> {
+    let info = get_active_instance_connection_info().await?;
+    let local_path = local_path.to_string();
+    let remote_path = format!("{}@{}:{}", info.user, info.address, remote_path);
+    let (arg1, arg2) = if upload {
+        (local_path, remote_path)
+    } else {
+        (remote_path, local_path)
+    };
+    let _ = Command::new("scp")
+        .arg("-i")
+        .arg(info.key_path)
+        .arg(arg1)
+        .arg(arg2)
         .stdout(Stdio::inherit())
         .stderr(Stdio::inherit())
         .stdin(Stdio::inherit())
@@ -301,6 +354,14 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
         Opt::Start => start_instance().await?,
         Opt::Stop => stop_instance().await?,
         Opt::Ssh => open_ssh().await?,
+        Opt::Upload {
+            local_file,
+            remote_file,
+        } => run_scp(&local_file, &remote_file, true).await?,
+        Opt::Download {
+            remote_file,
+            local_file,
+        } => run_scp(&local_file, &remote_file, false).await?,
         Opt::Status => instance_status().await?,
         Opt::Resize { instance_type } => instance_resize(&instance_type).await?,
         Opt::Ls { cloud, profile } => match cloud {
