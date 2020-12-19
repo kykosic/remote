@@ -31,9 +31,9 @@ remote start
 ```
 remote stop
 ```
-* SSH into active instance
+* SSH into active instance (optional port forwards)
 ```
-remote ssh
+remote ssh [-p 8888] [-p 8080]
 ```
 * Download file from active instance
 ```
@@ -51,7 +51,7 @@ remote resize [instance-type]
 ```
 remote ls
 ```
-* List available instance for a cloud/profile
+* List available instances (optional cloud/profile)
 ```
 remote ls [cloud] [profile]
 ```

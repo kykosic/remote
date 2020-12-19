@@ -39,7 +39,11 @@ enum Opt {
     #[structopt(about = "Get status of active instance")]
     Status,
     #[structopt(about = "SSH into the active instance")]
-    Ssh,
+    Ssh {
+        /// Optional ports to forward to the remote instance
+        #[structopt(short, long)]
+        ports: Option<Vec<u16>>,
+    },
     #[structopt(about = "Copy a file to the active instance", alias = "up")]
     Upload {
         /// The path of the local file
@@ -275,17 +279,23 @@ async fn stop_instance() -> Result<()> {
     Ok(())
 }
 
-async fn open_ssh() -> Result<()> {
+async fn open_ssh(ports: Option<Vec<u16>>) -> Result<()> {
     let info = get_active_instance_connection_info().await?;
     let addr = format!("{}@{}", info.user, info.address);
-    let _ = Command::new("ssh")
-        .arg("-i")
-        .arg(info.key_path)
-        .arg(addr)
-        .stdout(Stdio::inherit())
-        .stderr(Stdio::inherit())
-        .stdin(Stdio::inherit())
-        .output()?;
+    let mut c = Command::new("ssh");
+    c.arg("-i");
+    c.arg(info.key_path);
+    c.arg(addr);
+    if let Some(ports) = ports {
+        for p in ports.iter() {
+            c.arg("-L");
+            c.arg(format!("{}:localhost:{}", p, p));
+        }
+    }
+    c.stdout(Stdio::inherit());
+    c.stderr(Stdio::inherit());
+    c.stdin(Stdio::inherit());
+    c.output()?;
     Ok(())
 }
 
@@ -361,7 +371,7 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
         Opt::Rm { alias } => remove_instance(&alias)?,
         Opt::Start => start_instance().await?,
         Opt::Stop => stop_instance().await?,
-        Opt::Ssh => open_ssh().await?,
+        Opt::Ssh { ports } => open_ssh(ports).await?,
         Opt::Upload {
             local_file,
             remote_file,
