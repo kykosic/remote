@@ -2,6 +2,10 @@
 Simple CLI tool for managing cloud instances for remote development.
 
 
+Allows you to configure multiple remote instances with different cloud provider credential profiles. You can store
+configurations and swap between them (your "active" instance) for quick interaction.
+
+
 Currently only supports AWS EC2 instances, but I will add more cloud providers as I need.
 
 ## Install
@@ -31,9 +35,9 @@ remote start
 ```
 remote stop
 ```
-* SSH into active instance
+* SSH into active instance (optional port forwards)
 ```
-remote ssh
+remote ssh [-p 8888] [-p 8080]
 ```
 * Download file from active instance
 ```
@@ -47,11 +51,7 @@ remote upload /path/to/local.file /path/to/remote.file
 ```
 remote resize [instance-type]
 ```
-* List configured remote instances
-```
-remote ls
-```
-* List available instance for a cloud/profile
+* List available instances (optional cloud/profile)
 ```
 remote ls [cloud] [profile]
 ```
