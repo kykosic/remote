@@ -1,7 +1,6 @@
 use anyhow::{Error, Result};
 use dirs::home_dir;
 use serde::{Deserialize, Serialize};
-use serde_yaml;
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::string::ToString;
@@ -91,7 +90,7 @@ impl FromStr for Cloud {
 
 pub fn get_config_path() -> Result<PathBuf> {
     let path = home_dir()
-        .ok_or(Error::msg("Could not find home directory"))?
+        .ok_or_else(|| Error::msg("Could not find home directory"))?
         .join(".config/remote");
     if !path.exists() {
         ::std::fs::create_dir_all(&path)?;
