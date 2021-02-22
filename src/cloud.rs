@@ -25,7 +25,7 @@ impl ToString for Instance {
         let tag_string = self
             .tags
             .iter()
-            .map(|tag| format!("{}={}", tag.key, tag.value))
+            .map(|tag| format!("\"{}\"=\"{}\"", tag.key, tag.value))
             .collect::<Vec<String>>()
             .join(", ");
         format!(

@@ -1,3 +1,4 @@
+#![warn(rust_2018_idioms)]
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
@@ -37,7 +38,11 @@ enum Opt {
     #[structopt(about = "Stop active instance")]
     Stop,
     #[structopt(about = "Get status of active instance")]
-    Status,
+    Status {
+        /// Optionally show status of all configured instances
+        #[structopt(short, long)]
+        all: bool,
+    },
     #[structopt(about = "SSH into the active instance")]
     Ssh {
         /// Optional ports to forward to the remote instance
@@ -110,16 +115,12 @@ where
 
 fn set_active_instance(alias: &str) -> Result<()> {
     let mut config = ProfileConfig::get_or_create()?;
-    let names = config
-        .instances
-        .iter()
-        .map(|inst| inst.alias.clone())
-        .collect::<Vec<String>>();
-    if !names.contains(&alias.to_string()) {
-        Err(Error::msg(format!(
+    let is_configured = config.instances.iter().any(|inst| inst.alias == alias);
+    if !is_configured {
+        return Err(Error::msg(format!(
             "No instance with alias '{}' found, you may need to create it first",
             alias
-        )))?;
+        )));
     };
     config.active = Some(alias.to_string());
     config.update()?;
@@ -140,22 +141,18 @@ async fn new_instance(set_active: bool) -> Result<()> {
     let key_path = user_input("SSH key path")?;
     let path = expand_tilde(&key_path).unwrap();
     if !path.exists() {
-        Err(Error::msg(format!("Could not find key file: {}", key_path)))?;
+        return Err(Error::msg(format!("Could not find key file: {}", key_path)));
     };
     let user = user_input("SSH user name")?;
     let alias = user_input("Alias")?;
     println!("---");
 
-    let duplicates = config
-        .instances
-        .iter()
-        .filter(|inst| inst.alias == alias)
-        .collect::<Vec<_>>();
-    if duplicates.len() > 0 {
-        Err(Error::msg(format!(
+    let duplicates = config.instances.iter().any(|inst| inst.alias == alias);
+    if duplicates {
+        return Err(Error::msg(format!(
             "Instance with alias '{}' already exists",
             alias
-        )))?
+        )));
     };
 
     let instance = InstanceConfig {
@@ -200,17 +197,19 @@ fn get_manager(cloud: &Cloud, profile: &str) -> Result<Box<dyn InstanceManager>>
 
 fn get_active_instance() -> Result<InstanceConfig> {
     let config = ProfileConfig::get_or_create()?;
-    let active = config.active.ok_or(Error::msg("No active instance"))?;
+    let active = config
+        .active
+        .ok_or_else(|| Error::msg("No active instance"))?;
     let instances = config
         .instances
         .into_iter()
         .filter(|x| x.alias == active)
         .collect::<Vec<InstanceConfig>>();
-    if instances.len() == 0 {
-        Err(Error::msg(format!(
+    if instances.is_empty() {
+        return Err(Error::msg(format!(
             "Active instance '{}' not found in instance list",
             active
-        )))?;
+        )));
     };
     Ok(instances[0].to_owned())
 }
@@ -226,15 +225,13 @@ async fn get_active_instance_connection_info() -> Result<ConnectionInfo> {
     let manager = get_manager(&instance.cloud, &instance.profile)?;
     let status = manager.get_instance(&instance.instance_id).await?;
     if status.state.as_str() != "running" {
-        Err(Error::msg("Instance is not running"))?;
+        return Err(Error::msg("Instance is not running"));
     };
     if status.public_dns.as_str() == "" {
-        Err(Error::msg("Instance has no public DNS"))?;
+        return Err(Error::msg("Instance has no public DNS"));
     };
-    let key_path = expand_tilde(&instance.key_path).ok_or(Error::msg(format!(
-        "Could not locate key {}",
-        &instance.key_path
-    )))?;
+    let key_path = expand_tilde(&instance.key_path)
+        .ok_or_else(|| Error::msg(format!("Could not locate key {}", &instance.key_path)))?;
     Ok(ConnectionInfo {
         user: instance.user,
         address: status.public_dns,
@@ -322,14 +319,23 @@ async fn run_scp(local_path: &str, remote_path: &str, upload: bool, recursive: b
     Ok(())
 }
 
-async fn instance_status() -> Result<()> {
-    let instance = get_active_instance()?;
-    status(&instance).await
+async fn instance_status(all: bool) -> Result<()> {
+    if all {
+        let instances = ProfileConfig::get_or_create()?.instances;
+        for inst in instances.iter() {
+            status(inst).await?
+        }
+        Ok(())
+    } else {
+        let instance = get_active_instance()?;
+        status(&instance).await
+    }
 }
 
 async fn status(instance: &InstanceConfig) -> Result<()> {
     let manager = get_manager(&instance.cloud, &instance.profile)?;
     let status = manager.get_instance(&instance.instance_id).await?;
+    println!("---");
     println!("Alias: {}", instance.alias);
     println!("{}", status.to_string());
     Ok(())
@@ -382,7 +388,7 @@ async fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
             local_file,
             recursive,
         } => run_scp(&local_file, &remote_file, false, recursive).await?,
-        Opt::Status => instance_status().await?,
+        Opt::Status { all } => instance_status(all).await?,
         Opt::Resize { instance_type } => instance_resize(&instance_type).await?,
         Opt::Ls { cloud, profile } => match cloud {
             Some(cloud) => instance_list_cloud(&cloud, &profile).await?,
