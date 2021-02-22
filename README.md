@@ -25,7 +25,7 @@ remote instance [alias]
 ```
 * Get active instance status
 ```
-remote status
+remote status [--all]
 ```
 * Start active instance
 ```
