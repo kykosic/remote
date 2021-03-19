@@ -7,6 +7,7 @@ use std::string::ToString;
 
 use anyhow::{Error, Result};
 use dirs::home_dir;
+use futures::future::join_all;
 use remote::{AwsCloud, Cloud, InstanceConfig, InstanceManager, ProfileConfig};
 use structopt::StructOpt;
 
@@ -322,9 +323,8 @@ async fn run_scp(local_path: &str, remote_path: &str, upload: bool, recursive: b
 async fn instance_status(all: bool) -> Result<()> {
     if all {
         let instances = ProfileConfig::get_or_create()?.instances;
-        for inst in instances.iter() {
-            status(inst).await?
-        }
+        let futures = instances.iter().map(|inst| status(inst));
+        let _ = join_all(futures).await;
         Ok(())
     } else {
         let instance = get_active_instance()?;
